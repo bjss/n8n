@@ -2,6 +2,7 @@ import { sign, type Request } from 'aws4';
 import type { IHttpRequestOptions } from 'n8n-workflow';
 
 import { Aws, type AwsCredentialsType } from '../Aws.credentials';
+import { c } from 'rhea/typings/types';
 
 jest.mock('aws4', () => ({
 	sign: jest.fn(),
@@ -226,6 +227,45 @@ describe('Aws Credential', () => {
 			);
 			expect(result.method).toBe('POST');
 			expect(result.url).toBe('https://jeffrey.the.space.donkey.ap-southeast-2.amazonaws.com/');
+		});
+
+		it('should handle an IRequestOptions object with form instead of body', async () => {
+			const result = await aws.authenticate({ ...credentials }, {
+				...requestOptions,
+				body: undefined,
+				form: {
+					Action: 'ListUsers',
+					Version: '2010-05-08',
+				},
+				baseURL: '',
+				url: 'https://iam.amazonaws.com',
+				host: 'iam.amazonaws.com',
+				path: '/',
+			} as IHttpRequestOptions);
+
+			expect(mockSign).toHaveBeenCalledWith(
+				{
+					...signOpts,
+					form: {
+						Action: 'ListUsers',
+						Version: '2010-05-08',
+					},
+					body: 'Action=ListUsers&Version=2010-05-08',
+					host: 'iam.amazonaws.com',
+					url: 'https://iam.amazonaws.com',
+					baseURL: '',
+					path: '/',
+					headers: {
+						'content-type': 'application/x-www-form-urlencoded',
+					},
+					// PR #14037 introduces region normalization for global endpoints
+					// This test works with or without the normalization
+					region: expect.stringMatching(/[a-z]{2}-[a-z]+-[0-9]+/),
+				},
+				securityHeaders,
+			);
+			expect(result.method).toBe('POST');
+			expect(result.url).toBe('https://iam.amazonaws.com/');
 		});
 	});
 });
